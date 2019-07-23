@@ -155,11 +155,8 @@ def list_categories():
 def list_item(name, link, img, plot, act_str, playable):
     log('{} :  {} - {}'.format(name, link, img))
     li = xbmcgui.ListItem(label=name)
-    li.setArt({'thumb': img,
-                      'icon': '',
-                      'fanart': ''})
-    li.setInfo('video', {'title': name,
-                                'Plot': plot})
+    li.setArt({'thumb': img, 'icon': '', 'fanart': ''})
+    li.setInfo('video', {'title': name, 'Plot': plot})
     if playable:
         url = link
     else:
@@ -183,8 +180,6 @@ def list_content(category):
         for cont in content:
             name, link, img = cont
             list_item(name, link, img, '', action_str, False)
-            #play_url = voyo.channel(link)
-            #list_item(name, play_url, img, '', action_str, True)
     else:
         content = voyo.process_page(cat_link)
         if str(type(content)) == "<type 'list'>":
@@ -195,8 +190,6 @@ def list_content(category):
         else:
             action_str = 'play_vod'
             name, link, img, plot = content
-            #play_param = voyo.process_play_url(link)
-            #link = play_param['play_url']
             list_item(name, link, img, plot, action_str, False)
 
     xbmcplugin.addSortMethod(_handle, xbmcplugin.SORT_METHOD_NONE)
@@ -221,35 +214,26 @@ def device_status():
 
 
 def play_tv(category, name, link, img, plot):
-    xbmcplugin.setPluginCategory(_handle, 'TV stream')
-    xbmcplugin.setContent(_handle, name)
     device_status()
     play_url = voyo.channel(link)
-
     if play_url:
         headers = "User-agent: stagefright/1.2 (Linux;Android 6.0)"
-        PROTOCOL = 'mpd'
-        DRM = 'com.widevine.alpha'
-        is_helper = inputstreamhelper.Helper(PROTOCOL, drm=DRM)
+        PROTOCOL = 'hls'
+        is_helper = inputstreamhelper.Helper(PROTOCOL)
         if is_helper.check_inputstream():
             li = xbmcgui.ListItem(label=name, path=play_url)
-            li.setInfo( type = "Video", infoLabels = { "Title" : name, 
-                                                      "Plot": plot} )
-            li.setArt({'thumb': img,
-                              'icon': '',
-                              'fanart': ''})
+            li.setInfo(type="Video", infoLabels={"Title":name, "Plot":plot})
+            li.setArt({'thumb':img, 'icon':'', 'fanart':''})
             li.setProperty('inputstreamaddon', 'inputstream.adaptive')
-            li.setProperty('inputstream.adaptive.manifest_type', 'hls')
+            li.setProperty('inputstream.adaptive.manifest_type', PROTOCOL)
             li.setProperty('inputstream.adaptive.stream_headers', headers)
             li.setProperty("IsPlayable", str(True))
+            xbmc.Player().play(item=play_url, listitem=li)
+        else:
+            log('inputstreamhelper check failed.')
 
-            xbmcplugin.addDirectoryItem(_handle, play_url, li, False)
-
-    xbmcplugin.endOfDirectory(_handle)
 
 def play_vod(category, name, link, img, plot):
-    xbmcplugin.setPluginCategory(_handle, 'video on demand')
-    xbmcplugin.setContent(_handle, name)
     device_status()
     play_param = voyo.process_play_url(link)
     if play_param:
@@ -259,48 +243,24 @@ def play_vod(category, name, link, img, plot):
         is_helper = inputstreamhelper.Helper(PROTOCOL, drm=DRM)
         if is_helper.check_inputstream():
             li = xbmcgui.ListItem(label='Play( {} )'.format(name), path=play_param['play_url'])
-            li.setInfo( type = "Video", infoLabels = { "Title" : name, 
-                                                      "Plot":  plot} )
-            li.setArt({'thumb': img,
-                              'icon': '',
-                              'fanart': ''})
+            li.setInfo(type="Video", infoLabels={"Title":name, "Plot":plot})
+            li.setArt({'thumb':img, 'icon':'', 'fanart':''})
             li.setProperty('inputstreamaddon', 'inputstream.adaptive')
-            li.setProperty('inputstream.adaptive.manifest_type', 'mpd')
+            li.setProperty('inputstream.adaptive.manifest_type', PROTOCOL)
             li.setProperty('inputstream.adaptive.stream_headers', headers)
-            li.setProperty('inputstream.adaptive.license_type', 'com.widevine.alpha')
+            li.setProperty('inputstream.adaptive.license_type', DRM)
             licURL = play_param['license_url'] + '||R{SSM}|BJBwvlic'
             li.setProperty('inputstream.adaptive.license_key', licURL)
             li.setMimeType('application/dash+xml')
             li.setProperty("IsPlayable", str(True))
-
-            xbmcplugin.addDirectoryItem(_handle, play_param['play_url'], li, False)
-    xbmcplugin.endOfDirectory(_handle)
-
-def play_video(path):
-    log('play_video({})'.format(path))
-    """
-    Play a video by the provided path.
-    :param path: Fully-qualified video URL
-    :type path: str
-    """
-    # Create a playable item with a path to play.
-    play_item = xbmcgui.ListItem(path=path)
-    # Pass the item to the Kodi player.
-    xbmcplugin.setResolvedUrl(_handle, True, listitem=play_item)
+            xbmc.Player().play(item=play_param['play_url'], listitem=li)
 
 
 def router(paramstring):
-    # Parse a URL-encoded paramstring to the dictionary of
-    # {<parameter>: <value>} elements
-    log('router({})'.format(paramstring))
     params = dict(parse_qsl(paramstring))
-    # Check the parameters passed to the plugin
     if params:
-        log('params:{}'.format(str(params)))
         if params['action'] == 'listing_sections':
             list_content(params['category'])
-        elif params['action'] == 'play_tvcontent':
-            play_video(params['video'])
         elif params['action'] == 'play_vod':
             play_vod(params['category'], params['name'], params['link'],
                     params['img'], params['plot'])
